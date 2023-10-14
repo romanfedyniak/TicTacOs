@@ -11,6 +11,8 @@ GRID_SIZE = 150
 GRID_X = WIDTH / 2 - GRID_SIZE / 2
 GRID_Y = HEIGHT / 2 - GRID_SIZE / 2
 GRID_LINE_THICKNESS = 4
+GRID_CELL_SIZE = GRID_SIZE / 3 - ((GRID_SIZE / 3 / 10) * 3) ; GRID_SIZE / 3 * 0.7
+X_THICKNESS = 5
 
 BLACK = 00h
 WHITE = 0Fh
@@ -70,9 +72,47 @@ draw_board:
 
     sub dx, WIDTH
     jnz .vertical_lines
+
+    mov bx, 10
+    mov cx, 50
+    call draw_X
 .end:
     popa
     iret
+
+
+draw_X:
+    ; al - color
+    ; bx - x
+    ; cx - y
+    imul cx, WIDTH
+    add bx, cx
+    mov di, bx
+    add di, -WIDTH ; compensation
+    mov dx, GRID_CELL_SIZE * WIDTH + GRID_CELL_SIZE
+.loop1:
+    mov cx, X_THICKNESS
+    push di
+    add di, dx
+    rep stosb
+    pop di
+    sub dx, WIDTH + 1
+    jnz .loop1
+
+    mov dx, GRID_CELL_SIZE * WIDTH - GRID_CELL_SIZE
+    mov di, bx
+    add di, GRID_CELL_SIZE - WIDTH
+.loop2:
+    mov cx, X_THICKNESS
+    push di
+    add di, dx
+    rep stosb
+    pop di
+    sub dx, WIDTH - 1
+    jnz .loop2
+.end:
+    ret
+
 
 times 510 - ($-$$) db 0
 dw 0xAA55
