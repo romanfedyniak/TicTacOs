@@ -1,0 +1,78 @@
+format binary as "bin"
+    use16               ; 16-bit mode
+    org 7c00h           ; offset
+
+VGA_OFFSET = 0xA000
+
+WIDTH = 320
+HEIGHT = 200
+
+GRID_SIZE = 150
+GRID_X = WIDTH / 2 - GRID_SIZE / 2
+GRID_Y = HEIGHT / 2 - GRID_SIZE / 2
+GRID_LINE_THICKNESS = 4
+
+BLACK = 00h
+WHITE = 0Fh
+
+boot:
+    ; video mode 320х200 256 colors
+    mov ah, 0h
+    mov al, 13h
+    int 10h
+
+    mov dword [0x0070], draw
+
+    jmp $
+
+draw:
+    pusha
+
+    mov ax, 0x0000
+    mov ds, ax
+    mov ax, VGA_OFFSET
+    mov es, ax
+
+.clear:
+    xor di, di
+    mov cx, WIDTH * HEIGHT
+    mov al, WHITE
+    rep stosb
+
+draw_board:
+    mov al, BLACK
+    mov dx, WIDTH * GRID_LINE_THICKNESS
+.horizontal_lines:
+    mov cx, GRID_SIZE
+    mov di, GRID_X + WIDTH * (GRID_SIZE / 3 - GRID_LINE_THICKNESS / 2 + GRID_Y)
+    sub di, dx
+    rep stosb
+
+    mov cx, GRID_SIZE
+    mov di, GRID_X + WIDTH * (GRID_SIZE / 3 * 2 - GRID_LINE_THICKNESS / 2 + GRID_Y)
+    sub di, dx
+    rep stosb
+
+    sub dx, WIDTH
+    jnz .horizontal_lines
+
+    mov dx, GRID_SIZE * WIDTH
+.vertical_lines:
+    mov cx, GRID_LINE_THICKNESS
+    mov di, (GRID_SIZE / 3 - GRID_LINE_THICKNESS / 2 + GRID_X) + WIDTH * GRID_Y
+    add di, dx
+    rep stosb
+
+    mov cx, GRID_LINE_THICKNESS
+    mov di, (GRID_SIZE / 3 * 2 - GRID_LINE_THICKNESS / 2 + GRID_X) + WIDTH * GRID_Y
+    add di, dx
+    rep stosb
+
+    sub dx, WIDTH
+    jnz .vertical_lines
+.end:
+    popa
+    iret
+
+times 510 - ($-$$) db 0
+dw 0xAA55
