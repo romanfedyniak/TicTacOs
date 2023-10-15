@@ -1,0 +1,2 @@
+file "bin/boot.bin", 512
+file "bin/draw.bin", 512
