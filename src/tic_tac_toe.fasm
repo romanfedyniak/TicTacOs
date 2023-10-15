@@ -17,7 +17,16 @@ X_THICKNESS = 7
 BLACK = 00h
 WHITE = 0Fh
 
-draw_O equ 0000h:0500h
+_draw_O equ 0000h:0500h
+
+macro draw_O x, y, radius, thickness
+{
+    push x
+    push y
+    push radius
+    push thickness
+    call _draw_O
+}
 
 boot:
     ; load draw.bin to memory
@@ -86,13 +95,7 @@ draw_board:
     sub dx, WIDTH
     jnz .vertical_lines
 
-    ; al - color
-    ; stack: x, y, radius, thickness
-    push word 10
-    push word 100
-    push word 20
-    push word 5
-    call draw_O
+    draw_O 10, 100, 20, 5
 
     mov bx, 10
     mov cx, 50
