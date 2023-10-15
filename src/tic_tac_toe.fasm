@@ -73,6 +73,14 @@ draw_board:
     sub dx, WIDTH
     jnz .vertical_lines
 
+    ; al - color
+    ; stack: x, y, radius, thickness
+    push word 100
+    push word 100
+    push word 20
+    push word 5
+    call draw_O
+
     mov bx, 10
     mov cx, 50
     call draw_X
@@ -113,6 +121,179 @@ draw_X:
 .end:
     ret
 
+
+draw_O:
+    ; al - color
+    ; stack: x, y, radius, thickness
+    ; x equ bp+10
+    ; y equ bp+8
+    ; radius equ bp+6
+    ; thickness equ bp+4
+    virtual at bp
+        offset dd ?
+        thickness dw ?
+        radius dw ?
+        x dw ?
+        y dw ?
+    end virtual
+
+    push bp
+    mov bp, sp
+    
+    mov bx, [radius]
+    add [x], bx
+    add [y], bx
+    mov [yi], 0
+    mov [err_o], 1
+    sub [err_o], bx
+    mov [xi], bx
+    mov bx, [thickness]
+    sub [xi], bx
+    mov bx, [xi]
+    mov [err_i], 1
+    sub [err_i], bx
+ 
+.loop:
+    ; radius >= yi
+    mov bx, [radius]
+    cmp bx, [yi]
+    jnge .end
+
+    mov cx, [x]
+    add cx, [xi]
+    mov bx, [x]
+    add bx, [radius]
+    mov dx, [y]
+    add dx, [yi]
+    call x_line
+
+    mov dx, [y]
+    sub dx, [yi]
+    call x_line
+
+    mov cx, [x]
+    sub cx, [radius]
+    mov bx, [x]
+    sub bx, [xi]
+    call x_line
+
+    mov dx, [y]
+    add dx, [yi]
+    call x_line
+
+    mov cx, [x]
+    sub cx, [yi]
+    mov dx, [y]
+    add dx, [xi]
+    mov bx, [y]
+    add bx, [radius]
+    call y_line
+
+    mov cx, [x]
+    add cx, [yi]
+    call y_line
+
+    mov dx, [y]
+    sub dx, [radius]
+    mov bx, [y]
+    sub bx, [xi]
+    call y_line
+
+    mov cx, [x]
+    sub cx, [yi]
+    call y_line
+
+    inc word [yi]
+.condition1:
+    ; err_o < 0
+    cmp [err_o], 0
+    jnl .else1
+
+    ; err_o += 2 * yi + 1
+    imul bx, [yi], 2
+    add bx, 1
+    add [err_o], bx
+    jmp .condition2
+.else1:
+    sub word [radius], 1
+    ; err_o += 2 * (yi - radius + 1)
+    mov bx, [yi]
+    sub bx, [radius]
+    add bx, 1
+    imul bx, 2
+    add [err_o], bx
+.condition2:
+    ; yi > radius - thickness
+    mov bx, [radius]
+    sub bx, [thickness]
+    cmp [yi], bx
+    jng .else2
+    
+    mov bx, [yi]
+    mov [xi], bx
+    jmp .loop
+.else2:
+.condition3:
+    ; err_i < 0
+    cmp [err_i], 0
+    jnl .else3
+    
+    ; err_i += 2 * yi + 1
+    imul bx, [yi], 2
+    add bx, 1
+    add [err_i], bx
+    jmp .loop
+.else3:
+    sub [xi], 1
+    ; err_i += 2 * (yi - xi + 1)
+    mov bx, [yi]
+    sub bx, [xi]
+    add bx, 1
+    imul bx, 2
+    add [err_i], bx
+    jmp .loop
+.end:
+    leave
+    ret 4*2 ; delete param from stack
+
+x_line:
+    ; al - color
+    ; cx - x1
+    ; bx - x2
+    ; dx - y
+    push cx
+    mov ah, 0Ch
+.loop:
+    cmp cx, bx
+    jnle .end
+    int 10h
+    add cx, 1
+    jmp .loop
+.end:
+    pop cx
+    ret
+
+y_line:
+    ; al - color
+    ; cx - x
+    ; dx - y1
+    ; bx - y2
+    push dx
+    mov ah, 0Ch
+.loop:
+    cmp dx, bx
+    jnle .end
+    int 10h
+    add dx, 1
+    jmp .loop
+.end:
+    pop dx
+    ret
+
+xi dw 0
+err_o dw 0
+err_i dw 0
+yi dw 0
 
 times 510 - ($-$$) db 0
 dw 0xAA55
