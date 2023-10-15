@@ -134,7 +134,7 @@ draw_O:
     jmp .loop
 .end:
     leave
-    ret 4*2 ; delete param from stack
+    retf 4*2 ; delete param from stack
 
 x_line:
     ; al - color
