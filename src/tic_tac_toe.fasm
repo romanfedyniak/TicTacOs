@@ -52,6 +52,15 @@ macro draw_O x, y, radius, thickness
     call _draw_O
 }
 
+macro draw_rect width, height, x, y
+{
+    push width
+    push height
+    push x
+    push y
+    call _draw_rect
+}
+
 start:
     mov dword [0x0070], draw
 
@@ -73,41 +82,21 @@ draw:
 
 draw_board:
     mov al, BLACK
-    mov dx, WIDTH * GRID_LINE_THICKNESS
-.horizontal_lines:
-    mov cx, GRID_SIZE
-    mov di, GRID_X + WIDTH * (GRID_SIZE / 3 - GRID_LINE_THICKNESS / 2 + GRID_Y)
-    sub di, dx
-    rep stosb
 
-    mov cx, GRID_SIZE
-    mov di, GRID_X + WIDTH * (GRID_SIZE / 3 * 2 - GRID_LINE_THICKNESS / 2 + GRID_Y)
-    sub di, dx
-    rep stosb
+    ; horizontal lines
+    draw_rect GRID_SIZE, GRID_LINE_THICKNESS, GRID_X, GRID_Y + GRID_SIZE / 3 - GRID_LINE_THICKNESS / 2
+    draw_rect GRID_SIZE, GRID_LINE_THICKNESS, GRID_X, GRID_Y + GRID_SIZE / 3 * 2 - GRID_LINE_THICKNESS / 2
 
-    sub dx, WIDTH
-    jnz .horizontal_lines
-
-    mov dx, GRID_SIZE * WIDTH
-.vertical_lines:
-    mov cx, GRID_LINE_THICKNESS
-    mov di, (GRID_SIZE / 3 - GRID_LINE_THICKNESS / 2 + GRID_X) + WIDTH * GRID_Y
-    add di, dx
-    rep stosb
-
-    mov cx, GRID_LINE_THICKNESS
-    mov di, (GRID_SIZE / 3 * 2 - GRID_LINE_THICKNESS / 2 + GRID_X) + WIDTH * GRID_Y
-    add di, dx
-    rep stosb
-
-    sub dx, WIDTH
-    jnz .vertical_lines
+    ; vertical lines
+    draw_rect GRID_LINE_THICKNESS, GRID_SIZE, GRID_X + GRID_SIZE / 3 - GRID_LINE_THICKNESS / 2, GRID_Y
+    draw_rect GRID_LINE_THICKNESS, GRID_SIZE, GRID_X + GRID_SIZE / 3 * 2 - GRID_LINE_THICKNESS / 2, GRID_Y
 
     draw_O 10, 100, 20, 5
 
     mov bx, 10
     mov cx, 50
     call draw_X
+
 .end:
     popa
     iret
@@ -146,20 +135,41 @@ draw_X:
     ret
 
 
+_draw_rect:
+    ; al - color
+    ; stack: width, height, x, y
+    width equ bp+10
+    height equ bp+8
+    x equ bp+6
+    y equ bp+4
+
+    push bp
+    mov bp, sp
+
+    mov cx, [width]
+    imul di, [y], WIDTH
+    add di, [x]
+.loop:
+    push cx
+    rep stosb
+    pop cx
+    sub di, cx
+    add di, WIDTH
+    dec word [height]
+    jnz .loop
+
+.end:
+    leave
+    ret 4*2
+
+
 _draw_O:
     ; al - color
     ; stack: x, y, radius, thickness
-    ; x equ bp+10
-    ; y equ bp+8
-    ; radius equ bp+6
-    ; thickness equ bp+4
-    virtual at bp
-        offset dd ?
-        thickness dw ?
-        radius dw ?
-        y dw ?
-        x dw ?
-    end virtual
+    x equ bp+10
+    y equ bp+8
+    radius equ bp+6
+    thickness equ bp+4
 
     push bp
     mov bp, sp
