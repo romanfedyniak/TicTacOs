@@ -49,7 +49,7 @@ macro draw_O x, y, radius, thickness
     push y
     push radius
     push thickness
-    call 0000h:_draw_O
+    call _draw_O
 }
 
 start:
@@ -145,15 +145,16 @@ draw_X:
 .end:
     ret
 
+
 _draw_O:
     ; al - color
     ; stack: x, y, radius, thickness
-    ; x equ bp+12
-    ; y equ bp+10
-    ; radius equ bp+8
-    ; thickness equ bp+6
+    ; x equ bp+10
+    ; y equ bp+8
+    ; radius equ bp+6
+    ; thickness equ bp+4
     virtual at bp
-        offset dp ?
+        offset dd ?
         thickness dw ?
         radius dw ?
         y dw ?
@@ -277,7 +278,7 @@ _draw_O:
     jmp .loop
 .end:
     leave
-    retf 4*2 ; delete param from stack
+    ret 4*2 ; delete param from stack
 
 x_line:
     ; al - color
