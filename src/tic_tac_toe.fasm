@@ -2,6 +2,32 @@ format binary as "bin"
     use16               ; 16-bit mode
     org 7c00h           ; offset
 
+bootloader:
+    ; load program to memory
+    ; buffer address pointer 0000h:0500h
+    mov ax, 0000h
+    mov es, ax
+    mov bx, 500h
+    mov ch, 0       ; cylinder
+    mov cl, 2       ; sector
+    mov dh, 0       ; head
+    mov al, 2       ; sectors to read
+    mov ah, 02h
+    int 13h
+
+    ; video mode 320х200 256 colors
+    mov ah, 0h
+    mov al, 13h
+    int 10h
+
+    jmp 0000h:start
+
+times 510 - ($-$$) db 0
+dw 0xAA55
+
+
+org 500h
+
 VGA_OFFSET = 0xA000
 
 WIDTH = 320
@@ -26,23 +52,7 @@ macro draw_O x, y, radius, thickness
     call 0000h:_draw_O
 }
 
-boot:
-    ; load draw.bin to memory
-    mov ax, 0000h
-    mov es,ax
-    mov bx, 500h
-    mov ch, 0
-    mov cl, 02h
-    mov dh, 0
-    mov al, 01h
-    mov ah, 02h
-    int 13h
-
-    ; video mode 320х200 256 colors
-    mov ah, 0h
-    mov al, 13h
-    int 10h
-
+start:
     mov dword [0x0070], draw
 
     jmp $
@@ -134,12 +144,6 @@ draw_X:
     jnz .loop2
 .end:
     ret
-
-
-times 510 - ($-$$) db 0
-dw 0xAA55
-
-org 500h
 
 _draw_O:
     ; al - color
