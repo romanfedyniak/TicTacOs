@@ -1,3 +1,4 @@
+mkdir bin
 fasm src/tic_tac_toe.fasm bin/disk.img
 if %errorlevel% neq 0 exit /b %errorlevel%
 
