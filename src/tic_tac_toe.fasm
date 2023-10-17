@@ -36,19 +36,20 @@ HEIGHT = 200
 GRID_SIZE = 150
 GRID_X = WIDTH / 2 - GRID_SIZE / 2
 GRID_Y = HEIGHT / 2 - GRID_SIZE / 2
-GRID_LINE_THICKNESS = 4
+GRID_LINE_THICKNESS = 5
 GRID_CELL_SIZE = GRID_SIZE / 3 - ((GRID_SIZE / 3 / 10) * 3) ; GRID_SIZE / 3 * 0.7
-X_THICKNESS = 7
+X_THICKNESS = 6
+O_THICKNESS = 3
 
 BLACK = 00h
 WHITE = 0Fh
+RED = 27h
+BLUE = 01h
 
-macro draw_O x, y, radius, thickness
+macro draw_O x, y
 {
     push x
     push y
-    push radius
-    push thickness
     call _draw_O
 }
 
@@ -61,8 +62,30 @@ macro draw_rect width, height, x, y
     call _draw_rect
 }
 
+EMPTY_CELL = 0
+X_CELL = 1
+O_CELL = 2
+
+struc GameState
+{
+    ; ic - initial cell
+    .cells db 9 dup EMPTY_CELL 
+}
+
+virtual at 0
+    GameState GameState
+end virtual
+
+game_state equ 7E00h
+
 start:
     mov dword [0x0070], draw
+
+    ; initialize game state
+    mov cx, GameStateSize
+    mov si, initial_game_state
+    mov di, game_state
+    rep movsb
 
     jmp $
 
@@ -84,18 +107,55 @@ draw_board:
     mov al, BLACK
 
     ; horizontal lines
-    draw_rect GRID_SIZE, GRID_LINE_THICKNESS, GRID_X, GRID_Y + GRID_SIZE / 3 - GRID_LINE_THICKNESS / 2
-    draw_rect GRID_SIZE, GRID_LINE_THICKNESS, GRID_X, GRID_Y + GRID_SIZE / 3 * 2 - GRID_LINE_THICKNESS / 2
+    draw_rect GRID_SIZE, GRID_LINE_THICKNESS, GRID_X, GRID_Y + GRID_SIZE / 3 - GRID_LINE_THICKNESS / 2 - 1
+    draw_rect GRID_SIZE, GRID_LINE_THICKNESS, GRID_X, GRID_Y + GRID_SIZE / 3 * 2 - GRID_LINE_THICKNESS / 2 - 1
 
     ; vertical lines
-    draw_rect GRID_LINE_THICKNESS, GRID_SIZE, GRID_X + GRID_SIZE / 3 - GRID_LINE_THICKNESS / 2, GRID_Y
-    draw_rect GRID_LINE_THICKNESS, GRID_SIZE, GRID_X + GRID_SIZE / 3 * 2 - GRID_LINE_THICKNESS / 2, GRID_Y
+    draw_rect GRID_LINE_THICKNESS, GRID_SIZE, GRID_X + GRID_SIZE / 3 - GRID_LINE_THICKNESS / 2 - 1, GRID_Y
+    draw_rect GRID_LINE_THICKNESS, GRID_SIZE, GRID_X + GRID_SIZE / 3 * 2 - GRID_LINE_THICKNESS / 2 - 1, GRID_Y
 
-    draw_O 10, 100, 20, 5
 
-    mov bx, 10
-    mov cx, 50
+x dw ?
+y dw ?
+draw_cells:
+    mov [game_state + GameState.cells + 4], O_CELL
+    mov [game_state + GameState.cells + 2], X_CELL
+
+    mov si, game_state + GameState.cells
+    mov [x], 3 * (GRID_SIZE / 3)
+.loop:
+    mov [y], 3 * (GRID_SIZE / 3)
+
+@@:
+    mov bx, GRID_X - (GRID_SIZE / 3) + ((GRID_SIZE / 3) - GRID_CELL_SIZE) / 2
+    add bx, [x]
+    mov cx, GRID_Y - (GRID_SIZE / 3) + ((GRID_SIZE / 3) - GRID_CELL_SIZE) / 2
+    add cx, [y]
+   
+    lodsb ; load next cell from si
+    cmp al, EMPTY_CELL
+    jz .next_cell
+    cmp al, X_CELL
+    jz .draw_X
+    cmp al, O_CELL
+    jz .draw_O
+
+.draw_X:
+    mov al, RED
+    sub bx, X_THICKNESS / 2
     call draw_X
+    jmp .next_cell    
+.draw_O:
+    mov al, BLUE
+    draw_O bx, cx
+    jmp .next_cell
+
+.next_cell:
+    sub [y], (GRID_SIZE / 3)
+    jnz @B
+
+    sub [x], (GRID_SIZE / 3)
+    jnz .loop
 
 .end:
     popa
@@ -106,10 +166,15 @@ draw_X:
     ; al - color
     ; bx - x
     ; cx - y
+    push bx
+    push cx
+    push dx
+    push di
+
     imul cx, WIDTH
     add bx, cx
     mov di, bx
-    add di, -WIDTH ; compensation
+    add di, -WIDTH - 1 ; compensation
     mov dx, GRID_CELL_SIZE * WIDTH + GRID_CELL_SIZE
 .loop1:
     mov cx, X_THICKNESS
@@ -132,6 +197,10 @@ draw_X:
     sub dx, WIDTH - 1
     jnz .loop2
 .end:
+    pop di
+    pop dx
+    pop cx
+    pop bx
     ret
 
 
@@ -163,16 +232,23 @@ _draw_rect:
     ret 4*2
 
 
+radius dw ?
+xi dw ?
+err_o dw ?
+err_i dw ?
+yi dw ?
 _draw_O:
     ; al - color
-    ; stack: x, y, radius, thickness
-    x equ bp+10
-    y equ bp+8
-    radius equ bp+6
-    thickness equ bp+4
+    ; stack: x, y
+    x equ bp+6
+    y equ bp+4
+    mov [radius], GRID_CELL_SIZE / 2
 
     push bp
     mov bp, sp
+    push bx
+    push cx
+    push dx
     
     mov bx, [radius]
     add [x], bx
@@ -181,8 +257,7 @@ _draw_O:
     mov [err_o], 1
     sub [err_o], bx
     mov [xi], bx
-    mov bx, [thickness]
-    sub [xi], bx
+    sub [xi], O_THICKNESS
     mov bx, [xi]
     mov [err_i], 1
     sub [err_i], bx
@@ -259,7 +334,7 @@ _draw_O:
 .condition2:
     ; yi > radius - thickness
     mov bx, [radius]
-    sub bx, [thickness]
+    sub bx, O_THICKNESS
     cmp [yi], bx
     jng .else2
     
@@ -287,8 +362,11 @@ _draw_O:
     add [err_i], bx
     jmp .loop
 .end:
+    pop dx
+    pop cx
+    pop bx
     leave
-    ret 4*2 ; delete param from stack
+    ret 2*2 ; delete param from stack
 
 x_line:
     ; al - color
@@ -324,9 +402,7 @@ y_line:
     pop dx
     ret
 
-xi dw 0
-err_o dw 0
-err_i dw 0
-yi dw 0
 
+initial_game_state GameState
+GameStateSize = $-initial_game_state
 times 1024 - ($-$$) db 0
