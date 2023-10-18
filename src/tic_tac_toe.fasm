@@ -50,6 +50,7 @@ K_LEFT_ARROW = 4Bh
 K_UP_ARROW = 48h
 K_RIGHT_ARROW = 4Dh
 K_DOWN_ARROW = 50h
+K_ENTER = 1Ch
 
 macro draw_O x, y
 {
@@ -76,6 +77,7 @@ struc GameState
     ; ic - initial cell
     .cells db 9 dup EMPTY_CELL
     .select db 0
+    .turn db X_CELL
 }
 
 virtual at 0
@@ -103,31 +105,35 @@ start:
     mov ah, 0h
     int 16h
 
+    cmp ah, K_ENTER
+    jnz @F
+    jmp .turn
+@@:
     cmp ah, K_LEFT_ARROW
     jnz @F
-    sub [game_state + GameState.select], 1
+    sub byte [game_state + GameState.select], 1
     jmp .move_highlight
 @@:
     cmp ah, K_RIGHT_ARROW
     jnz @F
-    add [game_state + GameState.select], 1
+    add byte [game_state + GameState.select], 1
     jmp .move_highlight
 @@:
     cmp ah, K_UP_ARROW
     jnz @F
-    sub [game_state + GameState.select], 3
+    sub byte [game_state + GameState.select], 3
     jmp .move_highlight
 @@:
     cmp ah, K_DOWN_ARROW
     jnz .loop
-    add [game_state + GameState.select], 3
+    add byte [game_state + GameState.select], 3
     jmp .move_highlight
 
 .move_highlight:
     mov ah, [game_state + GameState.select]
     test ah, ah
     js .negative
-    cmp [game_state + GameState.select], 8
+    cmp byte [game_state + GameState.select], 8
     jng .loop
     sub ah, 9
     mov [game_state + GameState.select], ah
@@ -136,6 +142,24 @@ start:
     add ah, 9
     mov [game_state + GameState.select], ah
     jmp .loop
+
+.turn:
+    movzx di, [game_state + GameState.select]
+    ; if cell != EMPTY_CELL
+    cmp [game_state + GameState.cells + di], EMPTY_CELL
+    jne .loop
+    mov ah, [game_state + GameState.turn]
+    mov byte [game_state + GameState.cells + di], ah
+    ; if turn == X_CELL
+    cmp ah, X_CELL
+    je @F
+    ; else
+    mov byte [game_state + GameState.turn], X_CELL
+    jmp .loop
+@@:
+    mov byte [game_state + GameState.turn], O_CELL
+    jmp .loop
+
 
 draw:
     pusha
@@ -154,7 +178,7 @@ draw:
 draw_select:
     push GRID_SIZE / 3 ; width
     push GRID_SIZE / 3 ; height
-    mov ax, word [game_state + GameState.select]
+    movzx ax, byte [game_state + GameState.select]
     mov bl, 3
     div bl
     push ax
@@ -182,24 +206,21 @@ draw_board:
     ; vertical lines
     draw_rect GRID_LINE_THICKNESS, GRID_SIZE, GRID_X + GRID_SIZE / 3 - GRID_LINE_THICKNESS / 2 - 1, GRID_Y
     draw_rect GRID_LINE_THICKNESS, GRID_SIZE, GRID_X + GRID_SIZE / 3 * 2 - GRID_LINE_THICKNESS / 2 - 1, GRID_Y
+    jmp draw_cells
 
 
 x dw ?
 y dw ?
 draw_cells:
-    mov [game_state + GameState.cells + 0], O_CELL
-    mov [game_state + GameState.cells + 1], O_CELL
-    mov [game_state + GameState.cells + 2], X_CELL
-
     mov si, game_state + GameState.cells
-    mov [y], 3 * (GRID_SIZE / 3)
+    mov [y], 0
 .loop:
-    mov [x], 3 * (GRID_SIZE / 3)
+    mov [x], 0
 
 @@:
-    mov bx, GRID_X - (GRID_SIZE / 3) + ((GRID_SIZE / 3) - GRID_CELL_SIZE) / 2
+    mov bx, GRID_X + ((GRID_SIZE / 3) - GRID_CELL_SIZE) / 2
     add bx, [x]
-    mov cx, GRID_Y - (GRID_SIZE / 3) + ((GRID_SIZE / 3) - GRID_CELL_SIZE) / 2
+    mov cx, GRID_Y + ((GRID_SIZE / 3) - GRID_CELL_SIZE) / 2
     add cx, [y]
    
     lodsb ; load next cell from si
@@ -221,11 +242,13 @@ draw_cells:
     jmp .next_cell
 
 .next_cell:
-    sub [x], (GRID_SIZE / 3)
-    jnz @B
+    add [x], (GRID_SIZE / 3)
+    cmp [x], 3 * (GRID_SIZE / 3)
+    jne @B
 
-    sub [y], (GRID_SIZE / 3)
-    jnz .loop
+    add [y], (GRID_SIZE / 3)
+    cmp [y], 3 * (GRID_SIZE / 3)
+    jne .loop
 
 .end:
     popa
