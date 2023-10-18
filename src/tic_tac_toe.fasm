@@ -43,8 +43,13 @@ O_THICKNESS = 3
 
 BLACK = 00h
 WHITE = 0Fh
-RED = 27h
+RED = 0Ch
 BLUE = 01h
+
+K_LEFT_ARROW = 4Bh
+K_UP_ARROW = 48h
+K_RIGHT_ARROW = 4Dh
+K_DOWN_ARROW = 50h
 
 macro draw_O x, y
 {
@@ -69,7 +74,8 @@ O_CELL = 2
 struc GameState
 {
     ; ic - initial cell
-    .cells db 9 dup EMPTY_CELL 
+    .cells db 9 dup EMPTY_CELL
+    .select db 0
 }
 
 virtual at 0
@@ -87,7 +93,49 @@ start:
     mov di, game_state
     rep movsb
 
-    jmp $
+.loop:
+    hlt
+    ; if key pressed
+    mov ah, 1h
+    int 16h
+    jz .loop
+
+    mov ah, 0h
+    int 16h
+
+    cmp ah, K_LEFT_ARROW
+    jnz @F
+    sub [game_state + GameState.select], 1
+    jmp .move_highlight
+@@:
+    cmp ah, K_RIGHT_ARROW
+    jnz @F
+    add [game_state + GameState.select], 1
+    jmp .move_highlight
+@@:
+    cmp ah, K_UP_ARROW
+    jnz @F
+    sub [game_state + GameState.select], 3
+    jmp .move_highlight
+@@:
+    cmp ah, K_DOWN_ARROW
+    jnz .loop
+    add [game_state + GameState.select], 3
+    jmp .move_highlight
+
+.move_highlight:
+    mov ah, [game_state + GameState.select]
+    test ah, ah
+    js .negative
+    cmp [game_state + GameState.select], 8
+    jng .loop
+    sub ah, 9
+    mov [game_state + GameState.select], ah
+    jmp .loop
+.negative:
+    add ah, 9
+    mov [game_state + GameState.select], ah
+    jmp .loop
 
 draw:
     pusha
@@ -102,6 +150,27 @@ draw:
     mov cx, WIDTH * HEIGHT
     mov al, WHITE
     rep stosb
+
+draw_select:
+    push GRID_SIZE / 3 ; width
+    push GRID_SIZE / 3 ; height
+    mov ax, word [game_state + GameState.select]
+    mov bl, 3
+    div bl
+    push ax
+    mov cl, GRID_SIZE / 3
+    mov al, ah
+    mul cl
+    mov dx, ax
+    add dx, GRID_X
+    pop ax
+    push dx ; x
+    mul cl
+    mov dx, ax
+    add dx, GRID_Y
+    push dx ; y
+    mov al, 65h
+    call _draw_rect
 
 draw_board:
     mov al, BLACK
@@ -118,13 +187,14 @@ draw_board:
 x dw ?
 y dw ?
 draw_cells:
-    mov [game_state + GameState.cells + 4], O_CELL
+    mov [game_state + GameState.cells + 0], O_CELL
+    mov [game_state + GameState.cells + 1], O_CELL
     mov [game_state + GameState.cells + 2], X_CELL
 
     mov si, game_state + GameState.cells
-    mov [x], 3 * (GRID_SIZE / 3)
-.loop:
     mov [y], 3 * (GRID_SIZE / 3)
+.loop:
+    mov [x], 3 * (GRID_SIZE / 3)
 
 @@:
     mov bx, GRID_X - (GRID_SIZE / 3) + ((GRID_SIZE / 3) - GRID_CELL_SIZE) / 2
@@ -151,10 +221,10 @@ draw_cells:
     jmp .next_cell
 
 .next_cell:
-    sub [y], (GRID_SIZE / 3)
+    sub [x], (GRID_SIZE / 3)
     jnz @B
 
-    sub [x], (GRID_SIZE / 3)
+    sub [y], (GRID_SIZE / 3)
     jnz .loop
 
 .end:
