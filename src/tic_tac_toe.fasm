@@ -80,11 +80,9 @@ struc GameState
     .turn db X_CELL
 }
 
-virtual at 0
-    GameState GameState
+virtual at 7E00h
+    game_state GameState
 end virtual
-
-game_state equ 7E00h
 
 start:
     mov dword [0x0070], draw
@@ -111,53 +109,53 @@ start:
 @@:
     cmp ah, K_LEFT_ARROW
     jnz @F
-    sub byte [game_state + GameState.select], 1
+    sub byte [game_state.select], 1
     jmp .move_highlight
 @@:
     cmp ah, K_RIGHT_ARROW
     jnz @F
-    add byte [game_state + GameState.select], 1
+    add byte [game_state.select], 1
     jmp .move_highlight
 @@:
     cmp ah, K_UP_ARROW
     jnz @F
-    sub byte [game_state + GameState.select], 3
+    sub byte [game_state.select], 3
     jmp .move_highlight
 @@:
     cmp ah, K_DOWN_ARROW
     jnz .loop
-    add byte [game_state + GameState.select], 3
+    add byte [game_state.select], 3
     jmp .move_highlight
 
 .move_highlight:
-    mov ah, [game_state + GameState.select]
+    mov ah, [game_state.select]
     test ah, ah
     js .negative
-    cmp byte [game_state + GameState.select], 8
+    cmp byte [game_state.select], 8
     jng .loop
     sub ah, 9
-    mov [game_state + GameState.select], ah
+    mov [game_state.select], ah
     jmp .loop
 .negative:
     add ah, 9
-    mov [game_state + GameState.select], ah
+    mov [game_state.select], ah
     jmp .loop
 
 .turn:
-    movzx di, [game_state + GameState.select]
+    movzx di, byte [game_state.select]
     ; if cell != EMPTY_CELL
-    cmp [game_state + GameState.cells + di], EMPTY_CELL
+    cmp byte [game_state.cells + di], EMPTY_CELL
     jne .loop
-    mov ah, [game_state + GameState.turn]
-    mov byte [game_state + GameState.cells + di], ah
+    mov ah, [game_state.turn]
+    mov byte [game_state.cells + di], ah
     ; if turn == X_CELL
     cmp ah, X_CELL
     je @F
     ; else
-    mov byte [game_state + GameState.turn], X_CELL
+    mov byte [game_state.turn], X_CELL
     jmp .loop
 @@:
-    mov byte [game_state + GameState.turn], O_CELL
+    mov byte [game_state.turn], O_CELL
     jmp .loop
 
 
@@ -178,7 +176,7 @@ draw:
 draw_select:
     push GRID_SIZE / 3 ; width
     push GRID_SIZE / 3 ; height
-    movzx ax, byte [game_state + GameState.select]
+    movzx ax, byte [game_state.select]
     mov bl, 3
     div bl
     push ax
@@ -212,7 +210,7 @@ draw_board:
 x dw ?
 y dw ?
 draw_cells:
-    mov si, game_state + GameState.cells
+    mov si, game_state.cells
     mov [y], 0
 .loop:
     mov [x], 0
