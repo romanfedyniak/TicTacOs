@@ -2,6 +2,8 @@ format binary as "bin"
     use16               ; 16-bit mode
     org 7c00h           ; offset
 
+KERNEL_SECTOR_COUNT = 3
+
 bootloader:
     ; load program to memory
     ; buffer address pointer 0000h:0500h
@@ -11,7 +13,7 @@ bootloader:
     mov ch, 0       ; cylinder
     mov cl, 2       ; sector
     mov dh, 0       ; head
-    mov al, 2       ; sectors to read
+    mov al, KERNEL_SECTOR_COUNT ; sectors to read
     mov ah, 02h
     int 13h
 
@@ -72,12 +74,18 @@ EMPTY_CELL = 0
 X_CELL = 1
 O_CELL = 2
 
+; state
+GAME_ON = 0
+GAME_WON = 1
+GAME_DRAW = 2
+
 struc GameState
 {
     ; ic - initial cell
     .cells db 9 dup EMPTY_CELL
     .select db 0
     .turn db X_CELL
+    .state db GAME_ON
 }
 
 virtual at 7E00h
@@ -86,7 +94,7 @@ end virtual
 
 start:
     mov dword [0x0070], draw
-
+.restart:
     ; initialize game state
     mov cx, GameStateSize
     mov si, initial_game_state
@@ -105,7 +113,9 @@ start:
 
     cmp ah, K_ENTER
     jnz @F
-    jmp .turn
+    cmp [game_state.state], GAME_ON
+    je .turn
+    jmp .restart
 @@:
     cmp ah, K_LEFT_ARROW
     jnz @F
@@ -146,10 +156,29 @@ start:
     ; if cell != EMPTY_CELL
     cmp byte [game_state.cells + di], EMPTY_CELL
     jne .loop
-    mov ah, [game_state.turn]
-    mov byte [game_state.cells + di], ah
+    mov dl, [game_state.turn]
+    mov byte [game_state.cells + di], dl
+
+.check_game_draw:
+    mov si, 0
+@@:
+    cmp [game_state.cells + si], EMPTY_CELL
+    je @F
+
+    inc si
+    cmp si, 9
+    jne @B
+    mov [game_state.state], GAME_DRAW
+    jmp .loop
+@@:
+    call check_won
+    test ah, ah
+    jz @F
+    mov [game_state.state], GAME_WON
+    jmp .loop
+@@:
     ; if turn == X_CELL
-    cmp ah, X_CELL
+    cmp [game_state.turn], X_CELL
     je @F
     ; else
     mov byte [game_state.turn], X_CELL
@@ -157,6 +186,91 @@ start:
 @@:
     mov byte [game_state.turn], O_CELL
     jmp .loop
+
+
+i dd ?
+j dd ?
+row_count dd ?
+column_count dd ?
+diag1_count dd ?
+diag2_count dd ?
+check_won:
+    ; dl - player
+    ; return ah - is won
+    mov [row_count], 0
+    mov [column_count], 0
+    mov [diag1_count], 0
+    mov [diag2_count], 0
+
+    mov [i], 0
+.loop1:
+    mov [j], 0
+.loop2:
+    ; if cells[i * 3 + j] == player
+    movzx si, byte [i]
+    imul si, 3
+    mov al, byte [j]
+    cbw
+    add si, ax
+    cmp [game_state.cells + si], dl
+    jne @F
+    inc [row_count]
+@@:
+    ; if cells[j * 3 + i] == player
+    movzx si, byte [j]
+    imul si, 3
+    mov al, byte [i]
+    cbw
+    add si, ax
+    cmp [game_state.cells + si], dl
+    jne @F
+    inc [column_count]
+@@:
+    inc [j]
+    cmp [j], 3
+    jne .loop2
+
+    cmp [row_count], 3
+    je .win
+    cmp [column_count], 3
+    je .win
+
+    mov [row_count], 0
+    mov [column_count], 0
+
+    ; if cells[i * 3 + i] == player
+    mov al, byte [i]
+    cbw
+    imul si, ax, 3
+    add si, ax
+    cmp [game_state.cells + si], dl
+    jne @F
+    inc [diag1_count]
+@@:
+    ; if cells[i * 3 + 3 - i - 1] == player
+    mov al, byte [i]
+    cbw
+    imul si, ax, 3
+    add si, 3
+    sub si, ax
+    sub si, 1
+    cmp [game_state.cells + si], dl
+    jne @F
+    inc [diag2_count]
+@@:
+    inc [i]
+    cmp [i], 3
+    jne .loop1
+
+    cmp [diag1_count], 3
+    je .win
+    cmp [diag2_count], 3
+    je .win
+    xor ah, ah
+    ret
+.win:
+    mov ah, 1
+    ret
 
 
 draw:
@@ -231,11 +345,13 @@ draw_cells:
 
 .draw_X:
     mov al, RED
+    call get_color
     sub bx, X_THICKNESS / 2
     call draw_X
     jmp .next_cell
 .draw_O:
     mov al, BLUE
+    call get_color
     draw_O bx, cx
     jmp .next_cell
 
@@ -251,6 +367,24 @@ draw_cells:
 .end:
     popa
     iret
+
+get_color:
+    ; return al - color
+    cmp [game_state.state], GAME_ON
+    je .end
+    cmp [game_state.state], GAME_WON
+    jne .draw
+    cmp [game_state.turn], X_CELL
+    jne @F
+    mov al, RED
+    ret
+@@:
+    mov al, BLUE
+    ret
+.draw:
+    mov al, BLACK
+.end:
+    ret
 
 
 draw_X:
@@ -498,4 +632,4 @@ y_line:
 
 initial_game_state GameState
 GameStateSize = $-initial_game_state
-times 1024 - ($-$$) db 0
+times 512 * KERNEL_SECTOR_COUNT - ($-$$) db 0
