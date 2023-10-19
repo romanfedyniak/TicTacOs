@@ -465,11 +465,12 @@ x_line:
     ; bx - x2
     ; dx - y
     push cx
-    mov ah, 0Ch
 .loop:
     cmp cx, bx
     jnle .end
-    int 10h
+    imul di, dx, WIDTH
+    add di, cx
+    mov [es:di], al
     add cx, 1
     jmp .loop
 .end:
@@ -482,11 +483,12 @@ y_line:
     ; dx - y1
     ; bx - y2
     push dx
-    mov ah, 0Ch
 .loop:
     cmp dx, bx
     jnle .end
-    int 10h
+    imul di, dx, WIDTH
+    add di, cx
+    mov [es:di], al
     add dx, 1
     jmp .loop
 .end:
