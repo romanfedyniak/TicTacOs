@@ -220,7 +220,7 @@ draw_cells:
     add bx, [x]
     mov cx, GRID_Y + ((GRID_SIZE / 3) - GRID_CELL_SIZE) / 2
     add cx, [y]
-   
+
     lodsb ; load next cell from si
     cmp al, EMPTY_CELL
     jz .next_cell
@@ -233,7 +233,7 @@ draw_cells:
     mov al, RED
     sub bx, X_THICKNESS / 2
     call draw_X
-    jmp .next_cell    
+    jmp .next_cell
 .draw_O:
     mov al, BLUE
     draw_O bx, cx
@@ -340,7 +340,7 @@ _draw_O:
     push bx
     push cx
     push dx
-    
+
     mov bx, [radius]
     add [x], bx
     add [y], bx
@@ -352,7 +352,7 @@ _draw_O:
     mov bx, [xi]
     mov [err_i], 1
     sub [err_i], bx
- 
+
 .loop:
     ; radius >= yi
     mov bx, [radius]
@@ -428,7 +428,7 @@ _draw_O:
     sub bx, O_THICKNESS
     cmp [yi], bx
     jng .else2
-    
+
     mov bx, [yi]
     mov [xi], bx
     jmp .loop
@@ -437,7 +437,7 @@ _draw_O:
     ; err_i < 0
     cmp [err_i], 0
     jnl .else3
-    
+
     ; err_i += 2 * yi + 1
     imul bx, [yi], 2
     add bx, 1
