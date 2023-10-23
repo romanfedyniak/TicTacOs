@@ -160,6 +160,12 @@ start:
     mov byte [game_state.cells + di], dl
 
 .check_game_draw:
+    call check_won
+    test ah, ah
+    jz @F
+    mov [game_state.state], GAME_WON
+    jmp .loop
+@@:
     mov si, 0
 @@:
     cmp [game_state.cells + si], EMPTY_CELL
@@ -169,12 +175,6 @@ start:
     cmp si, 9
     jne @B
     mov [game_state.state], GAME_DRAW
-    jmp .loop
-@@:
-    call check_won
-    test ah, ah
-    jz @F
-    mov [game_state.state], GAME_WON
     jmp .loop
 @@:
     ; if turn == X_CELL
